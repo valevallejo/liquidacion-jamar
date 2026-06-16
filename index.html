@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Liquidación Jamar</title>
+
+<!-- ========================================================= -->
+<!--  CONFIGURACIÓN — solo cambias estas 3 líneas.             -->
+<!--  Tu hoja tiene 2 pestañas: una se muestra en el tab 60%   -->
+<!--  y la otra en el tab 30%. Cada pestaña tiene un "gid".    -->
+<!--  Mira la guía: paso "Sacar el gid de cada pestaña".       -->
+<!-- ========================================================= -->
+<script>
+  // ID de tu Google Sheet (ya está puesto, es el de tu enlace).
+  const SHEET_ID = "1Zvf017OwhwKMb7_0NEKvhU0PnegumNCLUilMh63pM7U";
+
+  // gid (número) de cada pestaña. Reemplaza por el correcto de cada una.
+  const GID_60 = "PEGA_AQUI_EL_GID_DE_LIQUIDACION_60";
+  const GID_30 = "PEGA_AQUI_EL_GID_DE_LIQUIDACION_30";
+
+  function urlCSV(gid){
+    return "https://docs.google.com/spreadsheets/d/"+SHEET_ID+"/export?format=csv&gid="+gid;
+  }
+</script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+
+<style>
+  :root{
+    --rojo:#e3000f;
+    --rojo-osc:#b8000c;
+    --gris:#f4f5f7;
+    --texto:#222;
+    --tenue:#777;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',Arial,sans-serif;background:var(--gris);color:var(--texto)}
+  header{background:var(--rojo);color:#fff;padding:18px 16px;text-align:center}
+  header h1{font-size:1.5rem;letter-spacing:.5px}
+  header p{font-size:.9rem;opacity:.9;margin-top:4px}
+
+  .controles{max-width:1200px;margin:0 auto;padding:14px 16px 0;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .controles input,.controles select{padding:10px 12px;border:1px solid #ccc;border-radius:8px;font-size:.95rem}
+  .controles input{flex:1;min-width:180px}
+
+  .tabs{max-width:1200px;margin:14px auto 0;padding:0 16px;display:flex;gap:8px}
+  .tab{flex:1;padding:14px;border:none;border-radius:10px 10px 0 0;background:#e4e6ea;color:#444;font-size:1rem;font-weight:600;cursor:pointer;transition:.15s}
+  .tab small{display:block;font-weight:400;font-size:.78rem;opacity:.8}
+  .tab.activo{background:var(--rojo);color:#fff}
+
+  .grid{max-width:1200px;margin:0 auto;padding:16px;display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px}
+  .card{background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 1px 5px rgba(0,0,0,.08);display:flex;flex-direction:column}
+  .card .foto{position:relative;aspect-ratio:1/1;background:#eee;overflow:hidden}
+  .card .foto img{width:100%;height:100%;object-fit:cover}
+  .badge{position:absolute;top:8px;left:8px;background:var(--rojo);color:#fff;font-weight:700;font-size:.85rem;padding:5px 9px;border-radius:20px}
+  .card .info{padding:12px;display:flex;flex-direction:column;gap:6px;flex:1}
+  .card .nombre{font-weight:600;font-size:.98rem;line-height:1.25}
+  .card .ref{font-size:.75rem;color:var(--tenue)}
+  .precios{margin-top:auto}
+  .antes{color:var(--tenue);text-decoration:line-through;font-size:.85rem}
+  .ahora{color:var(--rojo);font-weight:700;font-size:1.25rem}
+  .meta{display:flex;justify-content:space-between;font-size:.8rem;color:#555;border-top:1px solid #eee;padding-top:8px;margin-top:4px}
+  .inv{font-weight:600}
+  .inv.bajo{color:var(--rojo)}
+
+  .estado{text-align:center;padding:50px 20px;color:var(--tenue);font-size:1rem}
+  footer{text-align:center;padding:18px;color:var(--tenue);font-size:.8rem}
+  @media(max-width:480px){
+    .grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+    .tab{font-size:.85rem}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🛋️ Liquidación Jamar</h1>
+  <p>Productos en liquidación de todas las tiendas</p>
+</header>
+
+<div class="controles">
+  <input id="buscar" type="text" placeholder="Buscar producto o referencia...">
+  <select id="filtroTienda"><option value="">Todas las tiendas</option></select>
+</div>
+
+<div class="tabs">
+  <button class="tab activo" id="tabAlto" onclick="cambiarTab('alto')">
+    Liquidación 60% <small>60% o más</small>
+  </button>
+  <button class="tab" id="tabBajo" onclick="cambiarTab('bajo')">
+    Liquidación 30% <small>otros descuentos</small>
+  </button>
+</div>
+
+<div id="grid" class="grid"></div>
+<div id="estado" class="estado">Cargando productos…</div>
+
+<footer>Página de liquidaciones · Jamar</footer>
+
+<script>
+let TODOS = [];
+let tabActual = 'alto';
+const IMG_GENERICA = 'placeholder.svg';
+
+// ---- utilidades ----
+function num(v){ if(v==null) return 0; const n=parseFloat(String(v).replace(/[^0-9.,-]/g,'').replace(/\./g,'').replace(',','.')); return isNaN(n)?0:n; }
+function pesos(v){ return v ? '$'+v.toLocaleString('es-CO') : ''; }
+
+// busca un valor de la fila sin importar mayúsculas/acentos
+function campo(fila, ...nombres){
+  const claves = Object.keys(fila);
+  for(const n of nombres){
+    const k = claves.find(c => c.trim().toLowerCase() === n.toLowerCase());
+    if(k!=null && fila[k]!=null && String(fila[k]).trim()!=='') return String(fila[k]).trim();
+  }
+  return '';
+}
+
+function urlFoto(valor){
+  if(!valor) return IMG_GENERICA;
+  if(/^https?:\/\//i.test(valor)) return valor;     // es un link completo
+  return 'fotos/' + valor;                            // es un nombre de archivo en la carpeta fotos/
+}
+
+function normalizar(fila){
+  const antes = num(campo(fila,'PrecioAntes','Precio antes','Precio normal','Precio'));
+  const ahora = num(campo(fila,'PrecioLiquidacion','Precio liquidacion','Precio liquidación','Precio oferta','Precio final'));
+  let desc = num(campo(fila,'Descuento','% Descuento','Descuento %','Porcentaje'));
+  if(!desc && antes>0 && ahora>0) desc = Math.round((1 - ahora/antes)*100);
+  return {
+    nombre: campo(fila,'Producto','Nombre','Articulo','Artículo','Descripcion','Descripción') || 'Producto',
+    ref:    campo(fila,'Referencia','Ref','SKU','Codigo','Código'),
+    tienda: campo(fila,'Tienda','Almacen','Almacén','Sucursal'),
+    inv:    num(campo(fila,'Inventario','Stock','Existencias','Unidades','Cantidad')),
+    antes, ahora, desc,
+    foto:   urlFoto(campo(fila,'Foto','Imagen','Image','Url foto','Foto URL'))
+  };
+}
+
+function tarjeta(p){
+  const invBajo = p.inv>0 && p.inv<=3 ? 'bajo' : '';
+  const invTxt = p.inv>0 ? p.inv+' und' : 'Sin dato';
+  return `
+  <div class="card">
+    <div class="foto">
+      ${p.desc?`<span class="badge">-${p.desc}%</span>`:''}
+      <img src="${p.foto}" alt="${p.nombre}" onerror="this.onerror=null;this.src='${IMG_GENERICA}'">
+    </div>
+    <div class="info">
+      <div class="nombre">${p.nombre}</div>
+      ${p.ref?`<div class="ref">Ref: ${p.ref}</div>`:''}
+      <div class="precios">
+        ${p.antes?`<div class="antes">${pesos(p.antes)}</div>`:''}
+        <div class="ahora">${pesos(p.ahora)||'—'}</div>
+      </div>
+      <div class="meta">
+        <span>${p.tienda||''}</span>
+        <span class="inv ${invBajo}">${invTxt}</span>
+      </div>
+    </div>
+  </div>`;
+}
+
+function cambiarTab(t){
+  tabActual=t;
+  document.getElementById('tabAlto').classList.toggle('activo',t==='alto');
+  document.getElementById('tabBajo').classList.toggle('activo',t==='bajo');
+  pintar();
+}
+
+function pintar(){
+  const q = document.getElementById('buscar').value.toLowerCase().trim();
+  const tienda = document.getElementById('filtroTienda').value;
+  let lista = TODOS.filter(p => p.origen===tabActual);
+  if(tienda) lista = lista.filter(p=>p.tienda===tienda);
+  if(q) lista = lista.filter(p => (p.nombre+' '+p.ref).toLowerCase().includes(q));
+
+  const grid=document.getElementById('grid'), est=document.getElementById('estado');
+  if(lista.length===0){ grid.innerHTML=''; est.style.display='block'; est.textContent='No hay productos para mostrar en este filtro.'; return; }
+  est.style.display='none';
+  grid.innerHTML = lista.map(tarjeta).join('');
+}
+
+function llenarTiendas(){
+  const sel=document.getElementById('filtroTienda');
+  [...new Set(TODOS.map(p=>p.tienda).filter(Boolean))].sort().forEach(t=>{
+    const o=document.createElement('option'); o.value=t; o.textContent=t; sel.appendChild(o);
+  });
+}
+
+function leerHoja(gid, origen){
+  return new Promise((resolve)=>{
+    Papa.parse(urlCSV(gid),{
+      download:true, header:true, skipEmptyLines:true,
+      complete:(res)=>{
+        const filas = res.data.map(f=>{ const p=normalizar(f); p.origen=origen; return p; })
+                              .filter(p => p.ahora || p.antes || p.ref);
+        resolve(filas);
+      },
+      error:()=>resolve([])
+    });
+  });
+}
+
+function cargar(){
+  if(GID_60.startsWith('PEGA_AQUI') || GID_30.startsWith('PEGA_AQUI')){
+    document.getElementById('estado').innerHTML='⚠️ Falta poner el gid de las pestañas en el archivo index.html. Revisa la guía.';
+    return;
+  }
+  Promise.all([ leerHoja(GID_60,'alto'), leerHoja(GID_30,'bajo') ]).then(([a,b])=>{
+    TODOS = a.concat(b);
+    if(TODOS.length===0){ document.getElementById('estado').textContent='No se pudo leer la hoja. Verifica que esté compartida como "Cualquiera con el enlace".'; return; }
+    llenarTiendas();
+    pintar();
+  });
+}
+
+document.getElementById('buscar').addEventListener('input',pintar);
+document.getElementById('filtroTienda').addEventListener('change',pintar);
+cargar();
+</script>
+</body>
+</html>
