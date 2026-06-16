@@ -6,18 +6,27 @@
 <title>Liquidación Jamar</title>
 
 <!-- ========================================================= -->
-<!--  CONFIGURACIÓN — solo cambias estas 3 líneas.             -->
-<!--  Tu hoja tiene 2 pestañas: una se muestra en el tab 60%   -->
-<!--  y la otra en el tab 30%. Cada pestaña tiene un "gid".    -->
-<!--  Mira la guía: paso "Sacar el gid de cada pestaña".       -->
+<!--  CONFIGURACIÓN                                             -->
+<!--  La página lee 5 pestañas de tu Google Sheet y las une    -->
+<!--  por el CÓDIGO, que siempre está en la PRIMERA columna.   -->
 <!-- ========================================================= -->
 <script>
-  // ID de tu Google Sheet (ya está puesto, es el de tu enlace).
   const SHEET_ID = "1Zvf017OwhwKMb7_0NEKvhU0PnegumNCLUilMh63pM7U";
 
-  // gid (número) de cada pestaña. Reemplaza por el correcto de cada una.
-  const GID_60 = "488240662";
-  const GID_30 = "911640390";
+  // gid (número) de cada pestaña:
+  const GID_60         = "488240662";    // Liquidación 60%
+  const GID_30         = "911640390";    // Liquidación 30%
+  const GID_PRECIOS    = "1086284473";   // Precio
+  const GID_INVENTARIO = "1787664807";   // Inventario
+  const GID_FOTOS      = "0";            // Hoja 1 (fotos / nombre)
+
+  // Nombres de columnas (si algún día cambian los títulos, ajústalos aquí):
+  const COL_PRECIO    = "Oferta Costa 1";        // hoja Precio
+  const COL_DESCUENTO = "Dcto Costa 1";          // hoja Precio
+  const COL_CANTIDAD  = "Libre utilización";     // hoja Inventario
+  const COL_TIENDA    = "Nombre 1";              // hoja Inventario
+  const COL_NOMBRE    = "Nombre";                // Hoja 1
+  const COL_FOTO      = "Foto";                  // Hoja 1
 
   function urlCSV(gid){
     return "https://docs.google.com/spreadsheets/d/"+SHEET_ID+"/export?format=csv&gid="+gid;
@@ -80,7 +89,7 @@
 </header>
 
 <div class="controles">
-  <input id="buscar" type="text" placeholder="Buscar producto o referencia...">
+  <input id="buscar" type="text" placeholder="Buscar producto o código...">
   <select id="filtroTienda"><option value="">Todas las tiendas</option></select>
 </div>
 
@@ -105,13 +114,16 @@ const IMG_GENERICA = 'placeholder.svg';
 
 // ---- utilidades ----
 function num(v){ if(v==null) return 0; const n=parseFloat(String(v).replace(/[^0-9.,-]/g,'').replace(/\./g,'').replace(',','.')); return isNaN(n)?0:n; }
-function pesos(v){ return v ? '$'+v.toLocaleString('es-CO') : ''; }
+function pesos(v){ return v ? '$'+Math.round(v).toLocaleString('es-CO') : ''; }
+function codigo(v){ return String(v||'').trim().toUpperCase(); }
+function descPct(d){ if(d>0 && d<=1) return Math.round(d*100); return Math.round(d); }
 
-// busca un valor de la fila sin importar mayúsculas/acentos
+// busca un valor en la fila por nombre de columna, sin importar mayúsculas/acentos
 function campo(fila, ...nombres){
   const claves = Object.keys(fila);
+  const limpio = s => String(s).trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
   for(const n of nombres){
-    const k = claves.find(c => c.trim().toLowerCase() === n.toLowerCase());
+    const k = claves.find(c => limpio(c) === limpio(n));
     if(k!=null && fila[k]!=null && String(fila[k]).trim()!=='') return String(fila[k]).trim();
   }
   return '';
@@ -123,39 +135,38 @@ function urlFoto(valor){
   return 'fotos/' + valor;                            // es un nombre de archivo en la carpeta fotos/
 }
 
-function normalizar(fila){
-  const antes = num(campo(fila,'PrecioAntes','Precio antes','Precio normal','Precio'));
-  const ahora = num(campo(fila,'PrecioLiquidacion','Precio liquidacion','Precio liquidación','Precio oferta','Precio final'));
-  let desc = num(campo(fila,'Descuento','% Descuento','Descuento %','Porcentaje'));
-  if(!desc && antes>0 && ahora>0) desc = Math.round((1 - ahora/antes)*100);
-  return {
-    nombre: campo(fila,'Producto','Nombre','Articulo','Artículo','Descripcion','Descripción') || 'Producto',
-    ref:    campo(fila,'Referencia','Ref','SKU','Codigo','Código'),
-    tienda: campo(fila,'Tienda','Almacen','Almacén','Sucursal'),
-    inv:    num(campo(fila,'Inventario','Stock','Existencias','Unidades','Cantidad')),
-    antes, ahora, desc,
-    foto:   urlFoto(campo(fila,'Foto','Imagen','Image','Url foto','Foto URL'))
-  };
+// lee una pestaña como CSV y devuelve {rows, code} (code = título de la 1ª columna)
+function leerTab(gid){
+  return new Promise((resolve)=>{
+    Papa.parse(urlCSV(gid),{
+      download:true, header:true, skipEmptyLines:true,
+      complete:(r)=> resolve({ rows:r.data, code:(r.meta.fields&&r.meta.fields[0])||null }),
+      error:()=> resolve({ rows:[], code:null })
+    });
+  });
 }
 
-function tarjeta(p){
-  const invBajo = p.inv>0 && p.inv<=3 ? 'bajo' : '';
-  const invTxt = p.inv>0 ? p.inv+' und' : 'Sin dato';
+function tarjeta(p, tiendaSel){
+  let invNum, etiqueta;
+  if(tiendaSel){ invNum = p.tiendas[tiendaSel]||0; etiqueta = tiendaSel; }
+  else { invNum = p.inv; const n=Object.keys(p.tiendas).length; etiqueta = n? (n+(n===1?' tienda':' tiendas')) : ''; }
+  const invBajo = invNum>0 && invNum<=3 ? 'bajo' : '';
+  const invTxt = invNum>0 ? invNum+' und' : 'Sin dato';
   return `
   <div class="card">
     <div class="foto">
       ${p.desc?`<span class="badge">-${p.desc}%</span>`:''}
-      <img src="${p.foto}" alt="${p.nombre}" onerror="this.onerror=null;this.src='${IMG_GENERICA}'">
+      <img src="${p.foto}" alt="${p.nombre}" loading="lazy" onerror="this.onerror=null;this.src='${IMG_GENERICA}'">
     </div>
     <div class="info">
       <div class="nombre">${p.nombre}</div>
-      ${p.ref?`<div class="ref">Ref: ${p.ref}</div>`:''}
+      ${p.codigo?`<div class="ref">Cód: ${p.codigo}</div>`:''}
       <div class="precios">
         ${p.antes?`<div class="antes">${pesos(p.antes)}</div>`:''}
         <div class="ahora">${pesos(p.ahora)||'—'}</div>
       </div>
       <div class="meta">
-        <span>${p.tienda||''}</span>
+        <span>${etiqueta}</span>
         <span class="inv ${invBajo}">${invTxt}</span>
       </div>
     </div>
@@ -173,44 +184,68 @@ function pintar(){
   const q = document.getElementById('buscar').value.toLowerCase().trim();
   const tienda = document.getElementById('filtroTienda').value;
   let lista = TODOS.filter(p => p.origen===tabActual);
-  if(tienda) lista = lista.filter(p=>p.tienda===tienda);
-  if(q) lista = lista.filter(p => (p.nombre+' '+p.ref).toLowerCase().includes(q));
+  if(tienda) lista = lista.filter(p => (p.tiendas[tienda]||0) > 0);
+  if(q) lista = lista.filter(p => (p.nombre+' '+p.codigo).toLowerCase().includes(q));
 
   const grid=document.getElementById('grid'), est=document.getElementById('estado');
   if(lista.length===0){ grid.innerHTML=''; est.style.display='block'; est.textContent='No hay productos para mostrar en este filtro.'; return; }
   est.style.display='none';
-  grid.innerHTML = lista.map(tarjeta).join('');
+  grid.innerHTML = lista.map(p=>tarjeta(p,tienda)).join('');
 }
 
 function llenarTiendas(){
   const sel=document.getElementById('filtroTienda');
-  [...new Set(TODOS.map(p=>p.tienda).filter(Boolean))].sort().forEach(t=>{
-    const o=document.createElement('option'); o.value=t; o.textContent=t; sel.appendChild(o);
-  });
-}
-
-function leerHoja(gid, origen){
-  return new Promise((resolve)=>{
-    Papa.parse(urlCSV(gid),{
-      download:true, header:true, skipEmptyLines:true,
-      complete:(res)=>{
-        const filas = res.data.map(f=>{ const p=normalizar(f); p.origen=origen; return p; })
-                              .filter(p => p.ahora || p.antes || p.ref);
-        resolve(filas);
-      },
-      error:()=>resolve([])
-    });
-  });
+  const set=new Set();
+  TODOS.forEach(p=>Object.keys(p.tiendas).forEach(t=>set.add(t)));
+  [...set].sort().forEach(t=>{ const o=document.createElement('option'); o.value=t; o.textContent=t; sel.appendChild(o); });
 }
 
 function cargar(){
-  if(GID_60.startsWith('PEGA_AQUI') || GID_30.startsWith('PEGA_AQUI')){
-    document.getElementById('estado').innerHTML='⚠️ Falta poner el gid de las pestañas en el archivo index.html. Revisa la guía.';
-    return;
-  }
-  Promise.all([ leerHoja(GID_60,'alto'), leerHoja(GID_30,'bajo') ]).then(([a,b])=>{
-    TODOS = a.concat(b);
-    if(TODOS.length===0){ document.getElementById('estado').textContent='No se pudo leer la hoja. Verifica que esté compartida como "Cualquiera con el enlace".'; return; }
+  Promise.all([
+    leerTab(GID_60), leerTab(GID_30), leerTab(GID_PRECIOS), leerTab(GID_INVENTARIO), leerTab(GID_FOTOS)
+  ]).then(([liq60, liq30, prec, inv, fotos])=>{
+
+    // --- mapa de PRECIOS (código -> precio, descuento, nombre) ---
+    const mPrec={};
+    prec.rows.forEach(r=>{ const c=codigo(prec.code?r[prec.code]:Object.values(r)[0]); if(!c) return;
+      mPrec[c]={ precio:num(campo(r,COL_PRECIO,'Oferta Costa 1','Precio','Oferta')),
+                 dcto: descPct(num(campo(r,COL_DESCUENTO,'Dcto Costa 1','Descuento','Dcto'))),
+                 nombre: campo(r,'Nombre Producto','Nombre del producto','Nombre') }; });
+
+    // --- mapa de FOTOS / nombre (Hoja 1) ---
+    const mFoto={};
+    fotos.rows.forEach(r=>{ const c=codigo(fotos.code?r[fotos.code]:Object.values(r)[0]); if(!c) return;
+      mFoto[c]={ nombre:campo(r,COL_NOMBRE,'Nombre'), foto:campo(r,COL_FOTO,'Foto','Imagen','Image') }; });
+
+    // --- mapa de INVENTARIO (suma por código + detalle por tienda) ---
+    const mInv={};
+    inv.rows.forEach(r=>{ const c=codigo(inv.code?r[inv.code]:Object.values(r)[0]); if(!c) return;
+      const q=num(campo(r,COL_CANTIDAD,'Libre utilización','Libre utilizacion','Cantidad','Stock','Existencias'));
+      const t=campo(r,COL_TIENDA,'Nombre 1','Tienda','Centro','Almacén','Almacen');
+      if(!mInv[c]) mInv[c]={total:0,tiendas:{}};
+      mInv[c].total+=q;
+      if(t){ mInv[c].tiendas[t]=(mInv[c].tiendas[t]||0)+q; }
+    });
+
+    // --- construir productos a partir de las pestañas de liquidación ---
+    function construir(tab, origen){
+      return tab.rows.map(r=>{
+        const c=codigo(tab.code?r[tab.code]:Object.values(r)[0]); if(!c) return null;
+        const pr=mPrec[c]||{}, fo=mFoto[c]||{}, iv=mInv[c]||{total:0,tiendas:{}};
+        const nombre = fo.nombre || pr.nombre || campo(r,'NOMBRE DEL PRODUCTO','Nombre del producto','Nombre') || c;
+        const ahora = pr.precio||0;
+        const dcto  = pr.dcto||0;
+        const antes = (ahora && dcto>0 && dcto<100) ? ahora/(1-dcto/100) : 0;
+        return { codigo:c, nombre, foto:urlFoto(fo.foto), ahora, antes, desc:dcto, inv:iv.total, tiendas:iv.tiendas, origen };
+      }).filter(Boolean);
+    }
+
+    TODOS = construir(liq60,'alto').concat(construir(liq30,'bajo'));
+
+    if(TODOS.length===0){
+      document.getElementById('estado').innerHTML='No se pudieron leer los productos. Verifica que la hoja esté compartida como “Cualquiera con el enlace → Lector” y que los gid sean correctos.';
+      return;
+    }
     llenarTiendas();
     pintar();
   });
