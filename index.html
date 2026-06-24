@@ -7,11 +7,11 @@
 <script>
   const SHEET_ID = "1Zvf017OwhwKMb7_0NEKvhU0PnegumNCLUilMh63pM7U";
   const GID_PRODUCTOS  = "488240662";    // Liquidación 60% = lista maestra (con columna Tags)
-  const GID_PROD_EXTRA = "911640390";    // Liquidación 30% (transitoria; cuando la elimines, déjala vacía "")
+  const GID_PROD_EXTRA = "911640390";    // Liquidación 30% (transitoria; al eliminarla, deja "")
   const GID_PRECIOS    = "1086284473";   // Precio
   const GID_INVENTARIO = "1787664807";   // Inventario actual
-  const GID_FOTOS      = "0";            // Hoja 1 (fotos / nombre / sublínea)
-  const GID_BASE       = "2071290547";    // Hoja "Base" (inventario inicial).
+  const GID_FOTOS      = "0";            // Hoja 1 (fotos / nombre / sublínea / tags)
+  const GID_BASE       = "2071290547";   // Hoja "Base" (inventario inicial)
 
   const COL_LISTA     = "Lista Costa 1";
   const COL_PRECIO    = "Oferta Costa 1";
@@ -26,6 +26,9 @@
   function urlCSV(gid){ return "https://docs.google.com/spreadsheets/d/"+SHEET_ID+"/export?format=csv&gid="+gid; }
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
   :root{
     --rojo:#C8102E; --rojo-osc:#9A0D24; --rojo-soft:#FEF2F4;
@@ -36,24 +39,29 @@
   }
   *{box-sizing:border-box;margin:0;padding:0}
   html,body{overflow-x:hidden}
-  body{font-family:'Segoe UI',system-ui,Arial,sans-serif;background:var(--bg);color:var(--texto);font-size:15px;line-height:1.45}
+  body{font-family:'Inter','Segoe UI',system-ui,Arial,sans-serif;background:var(--bg);color:var(--texto);font-size:15px;line-height:1.45;-webkit-font-smoothing:antialiased;letter-spacing:-.1px}
 
   header{background:linear-gradient(110deg,var(--rojo),var(--rojo-osc));padding:18px 20px;display:flex;justify-content:center}
   .head-in{max-width:1280px;width:100%;display:flex;align-items:center;gap:16px}
   .logo{width:60px;height:60px;border-radius:16px;background:#fff;color:var(--rojo);font-weight:800;font-size:1.7rem;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(0,0,0,.18);flex:none}
-  .head-txt h1{color:#fff;font-size:1.6rem;font-weight:700;letter-spacing:-.3px}
+  .head-txt h1{color:#fff;font-size:1.6rem;font-weight:700;letter-spacing:-.4px}
   .head-txt p{color:rgba(255,255,255,.85);font-size:.92rem;margin-top:1px}
 
   .wrap{max-width:1280px;margin:0 auto;padding:0 20px 40px}
   .stats{display:flex;gap:10px;margin:18px 0 0;flex-wrap:wrap}
   .stat{flex:1;min-width:120px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:13px 16px}
-  .stat b{display:block;font-size:1.45rem;font-weight:600;color:var(--texto);line-height:1.1;letter-spacing:-.5px}
+  .stat b{display:block;font-size:1.45rem;font-weight:700;color:var(--texto);line-height:1.1;letter-spacing:-.5px}
   .stat span{font-size:.72rem;color:var(--muted);font-weight:500}
 
   .stickybar{position:sticky;top:0;z-index:20;background:var(--bg);padding-top:14px;margin-top:14px}
-  .tabs{display:flex;gap:6px;margin-bottom:10px}
-  .tab{flex:1;padding:11px;border:1px solid var(--border);border-radius:var(--r);background:var(--surface);color:var(--muted);font-size:.92rem;font-weight:600;cursor:pointer;transition:.15s}
-  .tab.activo{background:var(--rojo);color:#fff;border-color:var(--rojo)}
+  .navtabs{display:flex;gap:30px;border-bottom:1px solid var(--border);margin-bottom:14px;flex-wrap:wrap}
+  .navtab{background:none;border:none;border-bottom:2px solid transparent;margin-bottom:-1px;padding:12px 2px;font-size:.98rem;font-weight:600;color:var(--muted);cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:8px;transition:.15s}
+  .navtab .num{color:#C9CDD3;font-weight:600}
+  .navtab:hover{color:var(--texto)}
+  .navtab.activo{color:var(--rojo);border-bottom-color:var(--rojo)}
+  .navtab.activo .num{color:var(--rojo)}
+  @media(max-width:600px){ .navtabs{gap:18px} .navtab{font-size:.88rem} }
+
   .toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:8px 10px}
   .toolbar[hidden]{display:none}
   .tb-search{flex:1;min-width:160px;max-width:340px;padding:8px 11px;border:1px solid var(--border);border-radius:var(--r-sm);font-size:.88rem;font-family:inherit;background:#fff;color:var(--texto)}
@@ -78,9 +86,6 @@
   .tb-sel{padding:8px 12px;border:1px solid var(--border);border-radius:20px;background:#fff;font-size:.85rem;font-family:inherit;color:var(--texto);cursor:pointer}
   .tb-sel:focus{outline:none;border-color:var(--rojo);box-shadow:0 0 0 3px var(--rojo-soft)}
   .spacer{flex:1}
-  .switch{display:inline-flex;border:1px solid var(--border);border-radius:var(--r-sm);overflow:hidden;background:#fff}
-  .switch button{border:none;background:#fff;color:var(--muted);padding:7px 13px;font-size:.82rem;font-weight:500;cursor:pointer;font-family:inherit}
-  .switch button.on{background:var(--rojo);color:#fff}
 
   .conteo{font-size:.85rem;color:var(--muted);margin:12px 0}
   .conteo[hidden]{display:none}
@@ -93,14 +98,14 @@
   .card .foto img{width:100%;height:100%;object-fit:cover;display:block}
   .badge{position:absolute;top:8px;left:8px;background:var(--rojo);color:#fff;font-weight:600;font-size:.78rem;padding:3px 8px;border-radius:6px}
   .card .info{padding:11px 12px;display:flex;flex-direction:column;gap:5px;flex:1}
-  .card .nombre{font-weight:500;font-size:.9rem;line-height:1.3}
+  .card .nombre{font-weight:600;font-size:.9rem;line-height:1.3}
   .card .sub{font-size:.7rem;color:var(--muted)}
   .card .ref{font-size:.7rem;color:var(--muted)}
   .tagrow{display:flex;flex-wrap:wrap;gap:4px}
   .tag{background:#EEF1F4;color:#475569;font-size:.66rem;font-weight:600;padding:2px 7px;border-radius:5px}
   .precios{margin-top:auto;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
   .antes{color:var(--muted);text-decoration:line-through;font-size:.8rem}
-  .ahora{color:var(--rojo);font-weight:600;font-size:1.05rem}
+  .ahora{color:var(--rojo);font-weight:700;font-size:1.05rem}
   .verloc{display:flex;justify-content:space-between;align-items:center;gap:6px;font-size:.76rem;color:var(--muted);border:none;border-top:1px solid var(--border);padding:8px 0 0;margin-top:3px;cursor:pointer;background:none;width:100%;font-family:inherit;text-align:left}
   .verloc:hover{color:var(--rojo)}
   .verloc .pill{padding:1px 8px;border-radius:6px;font-weight:600;font-size:.72rem}
@@ -113,34 +118,10 @@
   .card-loc .l span:first-child{color:var(--muted)}
   .card-loc .l b{font-weight:600}
 
-  .tablaWrap{overflow:auto;max-width:100%;max-height:72vh;border:1px solid var(--border);border-radius:var(--r);background:#fff}
-  table.tabla{border-collapse:separate;border-spacing:0;font-size:.82rem;width:max-content;min-width:100%}
-  table.tabla th,table.tabla td{padding:8px 10px;border-bottom:1px solid var(--border);white-space:nowrap;text-align:center}
-  table.tabla thead th{position:sticky;top:0;background:#fff;color:var(--texto);font-weight:600;font-size:.72rem;text-transform:uppercase;letter-spacing:.3px;z-index:2;border-bottom:1px solid var(--border)}
-  table.tabla thead th.alm{color:var(--muted)}
-  .c-foto,.c-cod,.c-prod{position:sticky;background:#fff;z-index:1;text-align:left}
-  .c-foto{left:0;width:52px;min-width:52px}
-  .c-cod{left:52px;width:84px;min-width:84px}
-  .c-prod{left:136px;width:200px;min-width:200px}
-  thead .c-foto,thead .c-cod,thead .c-prod{z-index:4}
-  tbody tr:nth-child(even) td{background:#FAFAF8}
-  tbody tr:nth-child(even) .c-foto,tbody tr:nth-child(even) .c-cod,tbody tr:nth-child(even) .c-prod{background:#FAFAF8}
-  tbody tr:hover td{background:var(--rojo-soft)}
-  tbody tr:hover .c-foto,tbody tr:hover .c-cod,tbody tr:hover .c-prod{background:var(--rojo-soft)}
-  td.nombre{font-weight:500;white-space:normal}
-  td.antes{color:var(--muted);text-decoration:line-through}
-  td.precio{font-weight:600;color:var(--rojo)}
-  .tfoto{width:38px;height:38px;object-fit:cover;border-radius:6px;background:#f6f6f4}
-  td.cero{color:#cfd2d6}
-  td.hay{font-weight:600;color:var(--high)}
-  td.suma{font-weight:600}
-  tfoot td{position:sticky;bottom:0;background:#FFF7F8;font-weight:600;border-top:2px solid var(--rojo);z-index:3}
-  tfoot td.c-foto{left:0;z-index:5} tfoot td.c-cod{left:52px;z-index:5} tfoot td.c-prod{left:136px;z-index:5}
-
   /* Seguimiento */
   .seg-sum{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
   .seg-card{flex:1;min-width:150px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px}
-  .seg-card b{display:block;font-size:1.5rem;font-weight:600;letter-spacing:-.5px}
+  .seg-card b{display:block;font-size:1.5rem;font-weight:700;letter-spacing:-.5px}
   .seg-card span{font-size:.72rem;color:var(--muted)}
   table.seg{border-collapse:separate;border-spacing:0;width:100%;font-size:.86rem;background:#fff;border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
   table.seg th,table.seg td{padding:11px 12px;border-bottom:1px solid var(--border);text-align:right}
@@ -184,9 +165,9 @@
   </div>
 
   <div class="stickybar">
-    <div class="tabs">
-      <button class="tab activo" id="secProd" onclick="cambiarSeccion('productos')">Productos</button>
-      <button class="tab" id="secSeg" onclick="cambiarSeccion('seguimiento')">Seguimiento de evacuación</button>
+    <div class="navtabs">
+      <button class="navtab" id="secSeg" onclick="cambiarSeccion('seguimiento')"><span class="num">1</span> Seguimiento de evacuación</button>
+      <button class="navtab activo" id="secProd" onclick="cambiarSeccion('productos')"><span class="num">2</span> Detalle de producto</button>
     </div>
     <div class="toolbar" id="toolbar">
       <input id="buscar" class="tb-search" type="text" placeholder="Buscar producto... (ej: blanco bombillo)">
@@ -222,11 +203,6 @@
         <option value="precio-asc">Precio: menor a mayor</option>
         <option value="dcto-desc">% Descuento: mayor a menor</option>
       </select>
-      <span class="spacer"></span>
-      <span class="switch">
-        <button id="btnTarjetas" class="on" onclick="cambiarVista('tarjetas')">Tarjetas</button>
-        <button id="btnTabla" onclick="cambiarVista('tabla')">Tabla</button>
-      </span>
     </div>
   </div>
 
@@ -246,8 +222,8 @@
 <script>
 let TODOS=[], ALMACENES=[], SUBLINEAS=[], ALLTAGS=[];
 let SELEC=new Set(), SELSUB=new Set(), SELTAG=new Set();
-let seccion='productos', vista='tarjetas', pagina=1, orden='';
-let INVACT={}, INVBASE={}, BASE_OK=false;   // inventario actual/base por tienda (solo productos)
+let seccion='productos', pagina=1, orden='';
+let INVACT={}, INVBASE={}, BASE_OK=false;
 const PAGE_SIZE=36;
 const IMG_GENERICA='data:image/svg+xml;utf8,'+encodeURIComponent(
  "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 400'>"+
@@ -297,23 +273,6 @@ function tarjeta(p){
 }
 function toggleLoc(btn){ const d=btn.nextElementSibling; if(d&&d.classList.contains('card-loc')) d.hidden=!d.hidden; }
 
-function tablaHTML(lista, full){
-  const cols=SELEC.size?[...SELEC].sort():ALMACENES;
-  let head='<thead><tr><th class="c-foto">Foto</th><th class="c-cod">Código</th><th class="c-prod">Producto</th><th>Sublínea</th><th>Antes</th><th>Ahora</th><th>% Dcto</th><th>Inv.</th>'+cols.map(a=>'<th class="alm">'+esc(a)+'</th>').join('')+'</tr></thead>';
-  let body='<tbody>'+lista.map(p=>{
-    const iv=invVisible(p);
-    const celdas=cols.map(a=>{const q=p.tiendas[a]||0; return '<td class="'+(q>0?'hay':'cero')+'">'+(q>0?miles(q):'0')+'</td>';}).join('');
-    return '<tr><td class="c-foto"><img class="tfoto" src="'+esc(p.foto)+'" loading="lazy" onerror="this.onerror=null;this.src=window.IMG_GEN"></td>'+
-      '<td class="c-cod">'+esc(p.codigo)+'</td><td class="c-prod nombre">'+esc(p.nombre)+'</td><td>'+esc(p.sublinea||'')+'</td>'+
-      '<td class="antes">'+(pesos(p.antes)||'')+'</td><td class="precio">'+(pesos(p.ahora)||'—')+'</td><td>'+(p.desc?('-'+p.desc+'%'):'')+'</td>'+
-      '<td class="suma">'+miles(iv.total)+'</td>'+celdas+'</tr>';
-  }).join('')+'</tbody>';
-  let totInv=0; const totCol={}; cols.forEach(a=>totCol[a]=0);
-  full.forEach(p=>{ totInv+=invVisible(p).total; cols.forEach(a=>{ totCol[a]+=(p.tiendas[a]||0); }); });
-  let foot='<tfoot><tr><td class="c-foto"></td><td class="c-cod"></td><td class="c-prod">Subtotal por almacén</td><td></td><td></td><td></td><td>'+miles(totInv)+'</td>'+cols.map(a=>'<td>'+miles(totCol[a])+'</td>').join('')+'</tr></tfoot>';
-  return '<div class="tablaWrap"><table class="tabla">'+head+body+foot+'</table></div>';
-}
-
 // ---- chips ----
 function abrirChip(e,which){ e.stopPropagation(); const m={tag:'popTag',sub:'popSub',alm:'popAlm'}; Object.values(m).forEach(id=>{ if(id!==m[which]) document.getElementById(id).hidden=true; }); const pop=document.getElementById(m[which]); pop.hidden=!pop.hidden; }
 function cerrarPops(){ ['popTag','popSub','popAlm'].forEach(id=>document.getElementById(id).hidden=true); }
@@ -321,7 +280,7 @@ function updateChips(){
   const set=(chip,nEl,n)=>{ document.getElementById(nEl).textContent=n; document.getElementById(chip).classList.toggle('activo',n>0); };
   set('chipTag','nTag',SELTAG.size); set('chipSub','nSub',SELSUB.size); set('chipAlm','nAlm',SELEC.size);
 }
-function mkList(cont,arr,sel,fn){ document.getElementById(cont).innerHTML=arr.map(v=>'<label><input type="checkbox" value="'+esc(v)+'" onchange="'+fn+'(this.value,this.checked)">'+esc(v)+'</label>').join(''); }
+function mkList(cont,arr,fn){ document.getElementById(cont).innerHTML=arr.map(v=>'<label><input type="checkbox" value="'+esc(v)+'" onchange="'+fn+'(this.value,this.checked)">'+esc(v)+'</label>').join(''); }
 function filtList(cont,inp){ const q=document.getElementById(inp).value.toLowerCase().trim(); document.querySelectorAll('#'+cont+' label').forEach(l=>{ l.style.display=l.textContent.toLowerCase().includes(q)?'flex':'none'; }); }
 function onCheck(t,c){ if(c)SELEC.add(t); else SELEC.delete(t); updateChips(); pagina=1; pintar(); }
 function limpiarMS(){ SELEC.clear(); document.querySelectorAll('#msLista input').forEach(c=>c.checked=false); updateChips(); pagina=1; pintar(); }
@@ -364,7 +323,7 @@ function pintar(){
   const totalPag=Math.max(1,Math.ceil(total/PAGE_SIZE));
   if(pagina>totalPag) pagina=totalPag; if(pagina<1) pagina=1;
   const ini=(pagina-1)*PAGE_SIZE, slice=lista.slice(ini,ini+PAGE_SIZE);
-  cont.innerHTML=(vista==='tarjetas')?'<div class="grid">'+slice.map(p=>tarjeta(p)).join('')+'</div>':tablaHTML(slice,lista);
+  cont.innerHTML='<div class="grid">'+slice.map(p=>tarjeta(p)).join('')+'</div>';
   renderPaginacion(total,totalPag,ini);
 }
 function renderPaginacion(total,totalPag,ini){
@@ -383,7 +342,7 @@ function pintarSeguimiento(){
   const cont=document.getElementById('contenido'), est=document.getElementById('estado');
   est.style.display='none'; document.getElementById('paginacion').hidden=true;
   if(!BASE_OK){
-    cont.innerHTML='<div class="seg-info">Para activar el <b>Seguimiento de evacuación</b>:<br>1) En tu Google Sheet crea una pestaña llamada <b>Base</b> con el inventario inicial (mismo formato que la hoja Inventario: código en la 1ª columna, almacén y cantidad).<br>2) Pásame el <b>gid</b> de esa pestaña y lo conecto (línea <b>GID_BASE</b> del archivo).<br><br>Cada semana actualizas la hoja <b>Inventario</b> y aquí verás cuántas unidades se han evacuado y el % de avance por tienda.</div>';
+    cont.innerHTML='<div class="seg-info">Para activar el <b>Seguimiento de evacuación</b>:<br>1) En tu Google Sheet crea una pestaña <b>Base</b> con el inventario inicial (mismo formato que Inventario: código en la 1ª columna, almacén y cantidad).<br>2) Comparte la hoja y listo: aquí verás cuántas unidades se han evacuado y el % de avance por tienda.</div>';
     return;
   }
   const filas=ALMACENES.map(t=>{ const base=INVBASE[t]||0, act=INVACT[t]||0, evac=Math.max(0,base-act); const pct=base>0?Math.round(evac/base*100):0; return {t,base,act,evac,pct}; });
@@ -410,7 +369,6 @@ function cambiarSeccion(s){
   document.getElementById('conteo').hidden=!prod;
   pintar();
 }
-function cambiarVista(v){ vista=v; pagina=1; document.getElementById('btnTarjetas').classList.toggle('on',v==='tarjetas'); document.getElementById('btnTabla').classList.toggle('on',v==='tabla'); pintar(); }
 
 function cargar(){
   Promise.all([leerTab(GID_PRODUCTOS),leerTab(GID_PROD_EXTRA),leerTab(GID_PRECIOS),leerTab(GID_INVENTARIO),leerTab(GID_FOTOS),leerTab(GID_BASE)]).then(function(res){
@@ -443,7 +401,6 @@ function cargar(){
     agregar(prod1); agregar(prod2);
     SUBLINEAS=[...setSub].sort(); ALLTAGS=[...setTag].sort();
 
-    // seguimiento: inventario actual y base por tienda (solo productos de la lista)
     const codSet={}; TODOS.forEach(p=>codSet[p.codigo]=1);
     INVACT={}; TODOS.forEach(p=>{ Object.entries(p.tiendas).forEach(e=>{ INVACT[e[0]]=(INVACT[e[0]]||0)+e[1]; }); });
     INVBASE={}; let baseRows=0;
@@ -454,7 +411,7 @@ function cargar(){
     BASE_OK = baseRows>0;
 
     if(TODOS.length===0){ document.getElementById('estado').innerHTML='No se pudieron leer los productos. Verifica que la hoja esté compartida como "Cualquiera con el enlace → Lector".'; return; }
-    mkList('msLista',ALMACENES,SELEC,'onCheck'); mkList('subLista',SUBLINEAS,SELSUB,'onCheckSub'); mkList('tagLista',ALLTAGS,SELTAG,'onCheckTag');
+    mkList('msLista',ALMACENES,'onCheck'); mkList('subLista',SUBLINEAS,'onCheckSub'); mkList('tagLista',ALLTAGS,'onCheckTag');
     if(ALLTAGS.length===0) document.getElementById('chipTag').style.display='none';
     updateChips(); pintar();
   });
