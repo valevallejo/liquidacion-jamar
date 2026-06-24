@@ -86,6 +86,9 @@
   .tb-sel{padding:8px 12px;border:1px solid var(--border);border-radius:20px;background:#fff;font-size:.85rem;font-family:inherit;color:var(--texto);cursor:pointer}
   .tb-sel:focus{outline:none;border-color:var(--rojo);box-shadow:0 0 0 3px var(--rojo-soft)}
   .spacer{flex:1}
+  .filtro-aviso{font-size:.82rem;color:var(--rojo);background:var(--rojo-soft);border:1px solid #F6CDD3;border-radius:20px;padding:6px 12px;display:none;align-items:center;gap:8px;margin:12px 0 0}
+  .filtro-aviso.on{display:inline-flex}
+  .filtro-aviso button{border:none;background:var(--rojo);color:#fff;border-radius:20px;font-size:.74rem;font-weight:600;padding:3px 10px;cursor:pointer;font-family:inherit}
 
   .conteo{font-size:.85rem;color:var(--muted);margin:12px 0}
   .conteo[hidden]{display:none}
@@ -131,14 +134,23 @@
   table.seg tfoot td{font-weight:700;border-top:2px solid var(--rojo);background:#FFF7F8}
   table.seg tbody tr.seg-row{cursor:pointer}
   table.seg tbody tr.seg-row:hover td{background:var(--rojo-soft)}
-  .seg .caret{display:inline-block;transition:transform .15s;margin-right:8px;color:var(--muted);font-size:.8rem}
-  table.seg tbody tr.seg-row.abierto .caret{transform:rotate(90deg);color:var(--rojo)}
+  .seg .caret{display:inline-block;transition:transform .15s;margin-right:9px;color:var(--rojo);font-size:.8rem}
+  table.seg tbody tr.seg-row.abierto .caret{transform:rotate(90deg)}
+  .seg .alm-name{font-weight:700;color:var(--texto)}
+  table.seg tbody tr.seg-row:hover .alm-name{color:var(--rojo);text-decoration:underline}
   table.seg tbody tr.seg-det>td{background:#FAFAF8;padding:0}
-  table.subt{width:100%;border-collapse:collapse;font-size:.82rem}
-  table.subt th,table.subt td{padding:9px 16px;border-bottom:1px solid var(--border);text-align:right}
+  .subwrap{margin:0 0 4px 26px;border-left:3px solid #F1C6CD;padding:4px 0 8px}
+  .subcap{font-size:.68rem;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);font-weight:700;padding:9px 16px 5px}
+  table.subt{width:100%;border-collapse:collapse;font-size:.82rem;background:transparent}
+  table.subt th,table.subt td{padding:9px 16px;border-bottom:1px solid #EFEFEC;text-align:right}
   table.subt th:first-child,table.subt td:first-child{text-align:left;color:var(--texto)}
-  table.subt thead th{color:var(--muted);font-weight:600;font-size:.68rem;text-transform:uppercase;letter-spacing:.3px;background:#F4F4F1}
+  table.subt thead th{color:var(--muted);font-weight:600;font-size:.66rem;text-transform:uppercase;letter-spacing:.3px}
+  table.subt tbody tr.subt-row{cursor:pointer}
+  table.subt tbody tr.subt-row:hover td{background:#fff;color:var(--rojo)}
+  table.subt tbody tr.subt-row:hover td:first-child{font-weight:600}
   table.subt tbody tr:last-child td{border-bottom:none}
+  .subt .ir{color:#C9CDD3;font-size:.72rem;margin-left:8px}
+  table.subt tbody tr.subt-row:hover .ir{color:var(--rojo)}
   .seg-empty{padding:14px 16px;color:var(--muted)}
   .bar{position:relative;height:8px;background:#EEF1F4;border-radius:5px;overflow:hidden;min-width:90px;display:inline-block;vertical-align:middle}
   .bar>i{position:absolute;left:0;top:0;bottom:0;background:var(--high);border-radius:5px}
@@ -216,6 +228,7 @@
         <option value="dcto-desc">% Descuento: mayor a menor</option>
       </select>
     </div>
+    <span class="filtro-aviso" id="filtroAviso"></span>
   </div>
 
   <div class="conteo" id="conteo">—</div>
@@ -256,6 +269,7 @@ function miles(v){ return Math.round(v||0).toLocaleString('es-CO'); }
 function codigo(v){ return String(v||'').trim().toUpperCase(); }
 function descPct(d){ if(d>0&&d<=1) return Math.round(d*100); return Math.round(d); }
 function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function arg(s){ return esc(String(s==null?'':s).replace(/'/g,"\\'")); }
 function normaliza(s){ return String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,''); }
 function singular(w){ if(w.length>4 && /es$/.test(w)) return w.slice(0,-2); if(w.length>3 && /s$/.test(w)) return w.slice(0,-1); return w; }
 function textoBusq(p){ return normaliza(p.nombre+' '+p.codigo+' '+p.sublinea+' '+p.tags.join(' ')).split(/\s+/).map(singular).join(' '); }
@@ -292,6 +306,11 @@ function updateChips(){
   const set=(chip,nEl,n)=>{ document.getElementById(nEl).textContent=n; document.getElementById(chip).classList.toggle('activo',n>0); };
   set('chipTag','nTag',SELTAG.size); set('chipSub','nSub',SELSUB.size); set('chipAlm','nAlm',SELEC.size);
 }
+function syncChecks(){
+  document.querySelectorAll('#msLista input').forEach(c=>c.checked=SELEC.has(c.value));
+  document.querySelectorAll('#subLista input').forEach(c=>c.checked=SELSUB.has(c.value));
+  document.querySelectorAll('#tagLista input').forEach(c=>c.checked=SELTAG.has(c.value));
+}
 function mkList(cont,arr,fn){ document.getElementById(cont).innerHTML=arr.map(v=>'<label><input type="checkbox" value="'+esc(v)+'" onchange="'+fn+'(this.value,this.checked)">'+esc(v)+'</label>').join(''); }
 function filtList(cont,inp){ const q=document.getElementById(inp).value.toLowerCase().trim(); document.querySelectorAll('#'+cont+' label').forEach(l=>{ l.style.display=l.textContent.toLowerCase().includes(q)?'flex':'none'; }); }
 function onCheck(t,c){ if(c)SELEC.add(t); else SELEC.delete(t); updateChips(); pagina=1; pintar(); }
@@ -303,6 +322,18 @@ function filtrarSub(){ filtList('subLista','subSearch'); }
 function onCheckTag(t,c){ if(c)SELTAG.add(t); else SELTAG.delete(t); updateChips(); pagina=1; pintar(); }
 function limpiarTag(){ SELTAG.clear(); document.querySelectorAll('#tagLista input').forEach(c=>c.checked=false); updateChips(); pagina=1; pintar(); }
 function filtrarTag(){ filtList('tagLista','tagSearch'); }
+function limpiarTodo(){ SELEC.clear(); SELSUB.clear(); SELTAG.clear(); syncChecks(); updateChips(); pagina=1; pintar(); }
+
+function avisoFiltro(){
+  const av=document.getElementById('filtroAviso');
+  const partes=[];
+  if(SELEC.size) partes.push([...SELEC].join(', '));
+  if(SELSUB.size) partes.push([...SELSUB].join(', '));
+  if((SELEC.size||SELSUB.size) && seccion==='productos'){
+    av.classList.add('on');
+    av.innerHTML='Filtrando por '+esc(partes.join(' · '))+' <button onclick="limpiarTodo()">Quitar filtros</button>';
+  } else { av.classList.remove('on'); av.innerHTML=''; }
+}
 
 function filtrar(){
   const q=document.getElementById('buscar').value.trim();
@@ -322,6 +353,7 @@ function filtrar(){
 function cambiarOrden(v){ orden=v; pagina=1; pintar(); }
 
 function pintar(){
+  avisoFiltro();
   if(seccion==='seguimiento'){ pintarSeguimiento(); return; }
   const lista=filtrar();
   const cont=document.getElementById('contenido'), est=document.getElementById('estado'), total=lista.length;
@@ -355,11 +387,21 @@ function detalleSublinea(t){
   TODOS.forEach(p=>{ const q=p.tiendas[t]||0; if(q>0){ const s=p.sublinea||'(Sin sublínea)'; m[s]=(m[s]||0)+q; tot+=q; } });
   const arr=Object.entries(m).sort((a,b)=>b[1]-a[1]);
   if(!arr.length) return '<div class="seg-empty">Sin inventario actual en este almacén.</div>';
-  return '<table class="subt"><thead><tr><th>Sublínea</th><th>Unidades</th><th>Participación</th></tr></thead><tbody>'+
-    arr.map(e=>{ const pct=tot>0?Math.round(e[1]/tot*100):0; return '<tr><td>'+esc(e[0])+'</td><td>'+miles(e[1])+'</td><td><span class="bar mini"><i style="width:'+pct+'%"></i></span><span class="pctxt">'+pct+'%</span></td></tr>'; }).join('')+
-    '</tbody></table>';
+  const filas=arr.map(e=>{ const pct=tot>0?Math.round(e[1]/tot*100):0;
+    return '<tr class="subt-row" onclick="verProductos(\''+arg(t)+'\',\''+arg(e[0])+'\')" title="Ver estos productos">'+
+      '<td>'+esc(e[0])+'<span class="ir">ver productos ›</span></td><td>'+miles(e[1])+'</td>'+
+      '<td><span class="bar mini"><i style="width:'+pct+'%"></i></span><span class="pctxt">'+pct+'%</span></td></tr>'; }).join('');
+  return '<div class="subwrap"><div class="subcap">Inventario por sublínea en '+esc(t)+'</div>'+
+    '<table class="subt"><thead><tr><th>Sublínea</th><th>Unidades</th><th>Participación</th></tr></thead><tbody>'+filas+'</tbody></table></div>';
 }
 function toggleSeg(row){ const det=row.nextElementSibling; if(det&&det.classList.contains('seg-det')){ det.hidden=!det.hidden; row.classList.toggle('abierto',!det.hidden); } }
+
+function verProductos(t,sub){
+  SELEC=new Set([t]); SELSUB=new Set([sub]);
+  syncChecks(); updateChips(); pagina=1;
+  cambiarSeccion('productos');
+  window.scrollTo({top:0,behavior:'smooth'});
+}
 
 function pintarSeguimiento(){
   const cont=document.getElementById('contenido');
@@ -377,9 +419,9 @@ function pintarSeguimiento(){
     '<div class="seg-card"><b>'+miles(tEvac)+'</b><span>Unidades evacuadas</span></div>'+
     '<div class="seg-card"><b>'+pctG+'%</b><span>Avance de evacuación</span></div>'+
     '<div class="seg-card"><b>'+miles(tAct)+'</b><span>Inventario actual</span></div></div>';
-  html+='<div class="seg-hint">Ordenado por inventario actual. Haz clic en un almacén para ver el desglose por sublínea.</div>';
+  html+='<div class="seg-hint">Ordenado por inventario actual. Haz clic en un almacén para ver el desglose por sublínea, y en una sublínea para ver esos productos.</div>';
   html+='<table class="seg"><thead><tr><th>Almacén</th><th>Inv. base</th><th>Inv. actual</th><th>Evacuadas</th><th>% avance</th></tr></thead><tbody>'+
-    filas.map(f=>'<tr class="seg-row" onclick="toggleSeg(this)"><td><span class="caret">▸</span>'+esc(f.t)+'</td><td>'+miles(f.base)+'</td><td>'+miles(f.act)+'</td><td>'+miles(f.evac)+'</td><td><span class="bar"><i style="width:'+f.pct+'%"></i></span><span class="pctxt">'+f.pct+'%</span></td></tr>'+
+    filas.map(f=>'<tr class="seg-row" onclick="toggleSeg(this)"><td><span class="caret">▸</span><span class="alm-name">'+esc(f.t)+'</span></td><td>'+miles(f.base)+'</td><td>'+miles(f.act)+'</td><td>'+miles(f.evac)+'</td><td><span class="bar"><i style="width:'+f.pct+'%"></i></span><span class="pctxt">'+f.pct+'%</span></td></tr>'+
       '<tr class="seg-det" hidden><td colspan="5">'+detalleSublinea(f.t)+'</td></tr>').join('')+
     '</tbody><tfoot><tr><td>Total</td><td>'+miles(tBase)+'</td><td>'+miles(tAct)+'</td><td>'+miles(tEvac)+'</td><td>'+pctG+'%</td></tr></tfoot></table>';
   cont.innerHTML=html;
@@ -403,7 +445,7 @@ function cargar(){
       mPrec[c]={lista:num(campo(r,COL_LISTA,'Lista Costa 1','Lista')),precio:num(campo(r,COL_PRECIO,'Oferta Costa 1','Precio','Oferta')),dcto:descPct(num(campo(r,COL_DESCUENTO,'Dcto Costa 1','Descuento','Dcto'))),nombre:campo(r,'Nombre Producto','Nombre del producto','Nombre')}; });
     const mFoto={};
     fotos.rows.forEach(r=>{ const c=codigo(fotos.code?r[fotos.code]:Object.values(r)[0]); if(!c) return;
-      mFoto[c]={nombre:campo(r,COL_NOMBRE,'Nombre'),sublinea:campo(r,COL_SUBLINEA,'Sublinea','Sublínea','Sub linea'),foto:campo(r,COL_FOTO,'Foto','Imagen','Image')}; });
+      mFoto[c]={nombre:campo(r,COL_NOMBRE,'Nombre'),foto:campo(r,COL_FOTO,'Foto','Imagen','Image')}; });
     const mInv={}; const setAlm=new Set();
     inv.rows.forEach(r=>{ const c=codigo(inv.code?r[inv.code]:Object.values(r)[0]); if(!c) return;
       const q=num(campo(r,COL_CANTIDAD,'Libre utilización','Libre utilizacion','Cantidad','Stock','Existencias'));
@@ -414,10 +456,11 @@ function cargar(){
 
     const setSub=new Set(), setTag=new Set(), vistos={};
     function tagsDe(r){ const s=campo(r,COL_TAGS,'Tags','Etiquetas','Tag'); return s?s.split(/[;,/]/).map(x=>x.trim()).filter(Boolean):[]; }
+    // Sublínea: SIEMPRE desde la hoja de productos (Liquidación 60), fuente única
     function agregar(tab){ tab.rows.forEach(r=>{ const c=codigo(tab.code?r[tab.code]:Object.values(r)[0]); if(!c||vistos[c]) return; vistos[c]=1;
       const pr=mPrec[c]||{},fo=mFoto[c]||{},iv=mInv[c]||{total:0,tiendas:{}};
       const nombre=fo.nombre||pr.nombre||campo(r,'NOMBRE DEL PRODUCTO','Nombre del producto','Nombre')||c;
-      const sublinea=campo(r,COL_SUBLINEA,'Sublinea','Sublínea','Sub linea')||fo.sublinea||''; if(sublinea) setSub.add(sublinea);
+      const sublinea=campo(r,COL_SUBLINEA,'Sublinea','Sublínea','Sub linea'); if(sublinea) setSub.add(sublinea);
       const tags=tagsDe(r); tags.forEach(t=>setTag.add(t));
       const ahora=pr.precio||0,dcto=pr.dcto||0;
       const antes=(pr.lista&&pr.lista>0)?pr.lista:((ahora&&dcto>0&&dcto<100)?ahora/(1-dcto/100):0);
