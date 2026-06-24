@@ -60,7 +60,6 @@
   .navtab:hover{color:var(--texto)}
   .navtab.activo{color:var(--rojo);border-bottom-color:var(--rojo)}
   .navtab.activo .num{color:var(--rojo)}
-  @media(max-width:600px){ .navtabs{gap:18px} .navtab{font-size:.88rem} }
 
   .toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:8px 10px}
   .toolbar[hidden]{display:none}
@@ -74,6 +73,8 @@
   .chip.activo .chip-n{display:inline}
   .pop{position:absolute;z-index:40;top:calc(100% + 8px);left:0;width:260px;max-width:86vw;max-height:340px;overflow:auto;background:#fff;border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--shadow-lg);padding:10px}
   .pop[hidden]{display:none}
+  .pop-back{display:none}
+  .pop-titulo{display:none}
   .pop .txt{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:var(--r-sm);font-size:.85rem;font-family:inherit;margin-bottom:6px}
   .pop .txt:focus{outline:none;border-color:var(--rojo);box-shadow:0 0 0 3px var(--rojo-soft)}
   .checklist{display:flex;flex-direction:column;gap:1px}
@@ -171,7 +172,21 @@
 
   .estado{text-align:center;padding:46px 20px;color:var(--muted)}
   footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem}
-  @media(max-width:600px){ .grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px} .head-txt h1{font-size:1.3rem} }
+
+  @media(max-width:600px){
+    .grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+    .head-txt h1{font-size:1.3rem}
+    .navtabs{gap:18px}
+    .navtab{font-size:.88rem}
+    /* En móvil los filtros se abren como lámina inferior, sobre la pantalla */
+    .pop-back{display:block;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:39}
+    .pop-back[hidden]{display:none}
+    .pop{position:fixed;left:10px;right:10px;bottom:10px;top:auto;width:auto;max-width:none;max-height:78vh;border-radius:16px;padding:14px 14px 10px;box-shadow:0 -6px 30px rgba(0,0,0,.28)}
+    .pop-titulo{display:block;font-weight:700;font-size:1.02rem;margin:0 2px 10px;color:var(--texto)}
+    .pop .checklist label{padding:11px 8px;font-size:.95rem}
+    .pop .checklist input{width:20px;height:20px}
+    .pop-acc .prim{padding:10px 26px}
+  }
 </style>
 </head>
 <body>
@@ -198,6 +213,7 @@
       <div class="chip-wrap">
         <button class="chip" id="chipTag" onclick="abrirChip(event,'tag')">Tags <span class="chip-n" id="nTag"></span> ▾</button>
         <div class="pop" id="popTag" hidden onclick="event.stopPropagation()">
+          <div class="pop-titulo">Tags</div>
           <input class="txt" id="tagSearch" type="text" placeholder="Filtrar tag..." oninput="filtrarTag()">
           <div class="checklist" id="tagLista"></div>
           <div class="pop-acc"><button onclick="limpiarTag()">Limpiar</button><button class="prim" onclick="cerrarPops()">Listo</button></div>
@@ -206,6 +222,7 @@
       <div class="chip-wrap">
         <button class="chip" id="chipSub" onclick="abrirChip(event,'sub')">Sublínea <span class="chip-n" id="nSub"></span> ▾</button>
         <div class="pop" id="popSub" hidden onclick="event.stopPropagation()">
+          <div class="pop-titulo">Sublínea</div>
           <input class="txt" id="subSearch" type="text" placeholder="Filtrar sublínea..." oninput="filtrarSub()">
           <div class="checklist" id="subLista"></div>
           <div class="pop-acc"><button onclick="limpiarSub()">Limpiar</button><button class="prim" onclick="cerrarPops()">Listo</button></div>
@@ -214,6 +231,7 @@
       <div class="chip-wrap">
         <button class="chip" id="chipAlm" onclick="abrirChip(event,'alm')">Almacén <span class="chip-n" id="nAlm"></span> ▾</button>
         <div class="pop" id="popAlm" hidden onclick="event.stopPropagation()">
+          <div class="pop-titulo">Almacén</div>
           <input class="txt" id="msSearch" type="text" placeholder="Filtrar almacén..." oninput="filtrarMS()">
           <div class="checklist" id="msLista"></div>
           <div class="pop-acc"><button onclick="limpiarMS()">Limpiar</button><button class="prim" onclick="cerrarPops()">Listo</button></div>
@@ -243,6 +261,7 @@
     <button class="page-btn" id="pgNext" onclick="irAPagina(pagina+1)">Siguiente ›</button>
   </nav>
 </div>
+<div class="pop-back" id="popBack" hidden onclick="cerrarPops()"></div>
 <footer>Liquidación Decora · datos en vivo desde Google Sheets</footer>
 <script>
 let TODOS=[], ALMACENES=[], SUBLINEAS=[], ALLTAGS=[];
@@ -300,8 +319,9 @@ function tarjeta(p){
 function toggleLoc(btn){ const d=btn.nextElementSibling; if(d&&d.classList.contains('card-loc')) d.hidden=!d.hidden; }
 
 // ---- chips ----
-function abrirChip(e,which){ e.stopPropagation(); const m={tag:'popTag',sub:'popSub',alm:'popAlm'}; Object.values(m).forEach(id=>{ if(id!==m[which]) document.getElementById(id).hidden=true; }); const pop=document.getElementById(m[which]); pop.hidden=!pop.hidden; }
-function cerrarPops(){ ['popTag','popSub','popAlm'].forEach(id=>document.getElementById(id).hidden=true); }
+function setBack(){ const open=['popTag','popSub','popAlm'].some(id=>!document.getElementById(id).hidden); document.getElementById('popBack').hidden=!open; }
+function abrirChip(e,which){ e.stopPropagation(); const m={tag:'popTag',sub:'popSub',alm:'popAlm'}; Object.values(m).forEach(id=>{ if(id!==m[which]) document.getElementById(id).hidden=true; }); const pop=document.getElementById(m[which]); pop.hidden=!pop.hidden; setBack(); }
+function cerrarPops(){ ['popTag','popSub','popAlm'].forEach(id=>document.getElementById(id).hidden=true); setBack(); }
 function updateChips(){
   const set=(chip,nEl,n)=>{ document.getElementById(nEl).textContent=n; document.getElementById(chip).classList.toggle('activo',n>0); };
   set('chipTag','nTag',SELTAG.size); set('chipSub','nSub',SELSUB.size); set('chipAlm','nAlm',SELEC.size);
@@ -434,6 +454,7 @@ function cambiarSeccion(s){
   const prod=s==='productos';
   document.getElementById('toolbar').hidden=!prod;
   document.getElementById('conteo').hidden=!prod;
+  cerrarPops();
   pintar();
 }
 
@@ -456,7 +477,6 @@ function cargar(){
 
     const setSub=new Set(), setTag=new Set(), vistos={};
     function tagsDe(r){ const s=campo(r,COL_TAGS,'Tags','Etiquetas','Tag'); return s?s.split(/[;,/]/).map(x=>x.trim()).filter(Boolean):[]; }
-    // Sublínea: SIEMPRE desde la hoja de productos (Liquidación 60), fuente única
     function agregar(tab){ tab.rows.forEach(r=>{ const c=codigo(tab.code?r[tab.code]:Object.values(r)[0]); if(!c||vistos[c]) return; vistos[c]=1;
       const pr=mPrec[c]||{},fo=mFoto[c]||{},iv=mInv[c]||{total:0,tiendas:{}};
       const nombre=fo.nombre||pr.nombre||campo(r,'NOMBRE DEL PRODUCTO','Nombre del producto','Nombre')||c;
