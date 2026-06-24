@@ -6,11 +6,11 @@
 <title>Liquidación Decora</title>
 <script>
   const SHEET_ID = "1Zvf017OwhwKMb7_0NEKvhU0PnegumNCLUilMh63pM7U";
-  const GID_PRODUCTOS  = "488240662";    // Liquidación 60% = lista maestra (con columna Tags)
+  const GID_PRODUCTOS  = "488240662";    // Liquidación 60% = lista maestra (Tags + Sublinea)
   const GID_PROD_EXTRA = "911640390";    // Liquidación 30% (transitoria; al eliminarla, deja "")
   const GID_PRECIOS    = "1086284473";   // Precio
   const GID_INVENTARIO = "1787664807";   // Inventario actual
-  const GID_FOTOS      = "0";            // Hoja 1 (fotos / nombre / sublínea / tags)
+  const GID_FOTOS      = "0";            // Hoja 1
   const GID_BASE       = "2071290547";   // Hoja "Base" (inventario inicial)
 
   const COL_LISTA     = "Lista Costa 1";
@@ -123,14 +123,26 @@
   .seg-card{flex:1;min-width:150px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px}
   .seg-card b{display:block;font-size:1.5rem;font-weight:700;letter-spacing:-.5px}
   .seg-card span{font-size:.72rem;color:var(--muted)}
+  .seg-hint{font-size:.78rem;color:var(--muted);margin:0 2px 8px}
   table.seg{border-collapse:separate;border-spacing:0;width:100%;font-size:.86rem;background:#fff;border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
   table.seg th,table.seg td{padding:11px 12px;border-bottom:1px solid var(--border);text-align:right}
   table.seg th:first-child,table.seg td:first-child{text-align:left}
   table.seg thead th{background:#fff;color:var(--muted);font-weight:600;font-size:.72rem;text-transform:uppercase;letter-spacing:.3px}
-  table.seg tbody tr:hover td{background:var(--rojo-soft)}
   table.seg tfoot td{font-weight:700;border-top:2px solid var(--rojo);background:#FFF7F8}
+  table.seg tbody tr.seg-row{cursor:pointer}
+  table.seg tbody tr.seg-row:hover td{background:var(--rojo-soft)}
+  .seg .caret{display:inline-block;transition:transform .15s;margin-right:8px;color:var(--muted);font-size:.8rem}
+  table.seg tbody tr.seg-row.abierto .caret{transform:rotate(90deg);color:var(--rojo)}
+  table.seg tbody tr.seg-det>td{background:#FAFAF8;padding:0}
+  table.subt{width:100%;border-collapse:collapse;font-size:.82rem}
+  table.subt th,table.subt td{padding:9px 16px;border-bottom:1px solid var(--border);text-align:right}
+  table.subt th:first-child,table.subt td:first-child{text-align:left;color:var(--texto)}
+  table.subt thead th{color:var(--muted);font-weight:600;font-size:.68rem;text-transform:uppercase;letter-spacing:.3px;background:#F4F4F1}
+  table.subt tbody tr:last-child td{border-bottom:none}
+  .seg-empty{padding:14px 16px;color:var(--muted)}
   .bar{position:relative;height:8px;background:#EEF1F4;border-radius:5px;overflow:hidden;min-width:90px;display:inline-block;vertical-align:middle}
   .bar>i{position:absolute;left:0;top:0;bottom:0;background:var(--high);border-radius:5px}
+  .bar.mini{min-width:60px;height:6px}
   .pctxt{font-weight:600;margin-left:8px}
   .seg-info{background:#fff;border:1px dashed var(--border);border-radius:var(--r);padding:24px;color:var(--muted);text-align:center;line-height:1.6}
   .seg-info b{color:var(--texto)}
@@ -338,15 +350,26 @@ function renderPaginacion(total,totalPag,ini){
 }
 function irAPagina(n){ pagina=n; pintar(); window.scrollTo({top:0,behavior:'smooth'}); }
 
+function detalleSublinea(t){
+  const m={}; let tot=0;
+  TODOS.forEach(p=>{ const q=p.tiendas[t]||0; if(q>0){ const s=p.sublinea||'(Sin sublínea)'; m[s]=(m[s]||0)+q; tot+=q; } });
+  const arr=Object.entries(m).sort((a,b)=>b[1]-a[1]);
+  if(!arr.length) return '<div class="seg-empty">Sin inventario actual en este almacén.</div>';
+  return '<table class="subt"><thead><tr><th>Sublínea</th><th>Unidades</th><th>Participación</th></tr></thead><tbody>'+
+    arr.map(e=>{ const pct=tot>0?Math.round(e[1]/tot*100):0; return '<tr><td>'+esc(e[0])+'</td><td>'+miles(e[1])+'</td><td><span class="bar mini"><i style="width:'+pct+'%"></i></span><span class="pctxt">'+pct+'%</span></td></tr>'; }).join('')+
+    '</tbody></table>';
+}
+function toggleSeg(row){ const det=row.nextElementSibling; if(det&&det.classList.contains('seg-det')){ det.hidden=!det.hidden; row.classList.toggle('abierto',!det.hidden); } }
+
 function pintarSeguimiento(){
-  const cont=document.getElementById('contenido'), est=document.getElementById('estado');
-  est.style.display='none'; document.getElementById('paginacion').hidden=true;
+  const cont=document.getElementById('contenido');
+  document.getElementById('estado').style.display='none'; document.getElementById('paginacion').hidden=true;
   if(!BASE_OK){
     cont.innerHTML='<div class="seg-info">Para activar el <b>Seguimiento de evacuación</b>:<br>1) En tu Google Sheet crea una pestaña <b>Base</b> con el inventario inicial (mismo formato que Inventario: código en la 1ª columna, almacén y cantidad).<br>2) Comparte la hoja y listo: aquí verás cuántas unidades se han evacuado y el % de avance por tienda.</div>';
     return;
   }
   const filas=ALMACENES.map(t=>{ const base=INVBASE[t]||0, act=INVACT[t]||0, evac=Math.max(0,base-act); const pct=base>0?Math.round(evac/base*100):0; return {t,base,act,evac,pct}; });
-  filas.sort((a,b)=>b.pct-a.pct);
+  filas.sort((a,b)=>b.act-a.act);
   let tBase=0,tAct=0,tEvac=0; filas.forEach(f=>{tBase+=f.base;tAct+=f.act;tEvac+=f.evac;});
   const pctG=tBase>0?Math.round(tEvac/tBase*100):0;
   let html='<div class="seg-sum">'+
@@ -354,8 +377,10 @@ function pintarSeguimiento(){
     '<div class="seg-card"><b>'+miles(tEvac)+'</b><span>Unidades evacuadas</span></div>'+
     '<div class="seg-card"><b>'+pctG+'%</b><span>Avance de evacuación</span></div>'+
     '<div class="seg-card"><b>'+miles(tAct)+'</b><span>Inventario actual</span></div></div>';
+  html+='<div class="seg-hint">Ordenado por inventario actual. Haz clic en un almacén para ver el desglose por sublínea.</div>';
   html+='<table class="seg"><thead><tr><th>Almacén</th><th>Inv. base</th><th>Inv. actual</th><th>Evacuadas</th><th>% avance</th></tr></thead><tbody>'+
-    filas.map(f=>'<tr><td>'+esc(f.t)+'</td><td>'+miles(f.base)+'</td><td>'+miles(f.act)+'</td><td>'+miles(f.evac)+'</td><td><span class="bar"><i style="width:'+f.pct+'%"></i></span><span class="pctxt">'+f.pct+'%</span></td></tr>').join('')+
+    filas.map(f=>'<tr class="seg-row" onclick="toggleSeg(this)"><td><span class="caret">▸</span>'+esc(f.t)+'</td><td>'+miles(f.base)+'</td><td>'+miles(f.act)+'</td><td>'+miles(f.evac)+'</td><td><span class="bar"><i style="width:'+f.pct+'%"></i></span><span class="pctxt">'+f.pct+'%</span></td></tr>'+
+      '<tr class="seg-det" hidden><td colspan="5">'+detalleSublinea(f.t)+'</td></tr>').join('')+
     '</tbody><tfoot><tr><td>Total</td><td>'+miles(tBase)+'</td><td>'+miles(tAct)+'</td><td>'+miles(tEvac)+'</td><td>'+pctG+'%</td></tr></tfoot></table>';
   cont.innerHTML=html;
 }
@@ -392,7 +417,7 @@ function cargar(){
     function agregar(tab){ tab.rows.forEach(r=>{ const c=codigo(tab.code?r[tab.code]:Object.values(r)[0]); if(!c||vistos[c]) return; vistos[c]=1;
       const pr=mPrec[c]||{},fo=mFoto[c]||{},iv=mInv[c]||{total:0,tiendas:{}};
       const nombre=fo.nombre||pr.nombre||campo(r,'NOMBRE DEL PRODUCTO','Nombre del producto','Nombre')||c;
-      const sublinea=fo.sublinea||''; if(sublinea) setSub.add(sublinea);
+      const sublinea=campo(r,COL_SUBLINEA,'Sublinea','Sublínea','Sub linea')||fo.sublinea||''; if(sublinea) setSub.add(sublinea);
       const tags=tagsDe(r); tags.forEach(t=>setTag.add(t));
       const ahora=pr.precio||0,dcto=pr.dcto||0;
       const antes=(pr.lista&&pr.lista>0)?pr.lista:((ahora&&dcto>0&&dcto<100)?ahora/(1-dcto/100):0);
