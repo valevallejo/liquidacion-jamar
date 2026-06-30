@@ -127,15 +127,15 @@
   .seg-card b{display:block;font-size:1.5rem;font-weight:700;letter-spacing:-.5px}
   .seg-card span{font-size:.72rem;color:var(--muted)}
   .seg-hint{font-size:.78rem;color:var(--muted);margin:0 2px 8px}
-  .seg-scroll{max-height:74vh;overflow:auto;border:1px solid var(--border);border-radius:var(--r);background:#fff}
+  .seg-scroll{border:1px solid var(--border);border-radius:var(--r);background:#fff;overflow:hidden}
   table.seg{border-collapse:separate;border-spacing:0;width:100%;font-size:.86rem;background:#fff}
   table.seg th,table.seg td{padding:11px 12px;border-bottom:1px solid var(--border);text-align:right;white-space:nowrap}
   table.seg th:first-child,table.seg td:first-child{text-align:left}
-  table.seg thead th{position:sticky;top:0;z-index:3;background:#fff;color:var(--muted);font-weight:600;font-size:.72rem;text-transform:uppercase;letter-spacing:.3px;box-shadow:inset 0 -1px 0 var(--border)}
-  table.seg tfoot td{position:sticky;bottom:0;z-index:3;font-weight:700;background:#FFF7F8;box-shadow:inset 0 1px 0 var(--rojo)}
+  table.seg thead th{background:#fff;color:var(--muted);font-weight:600;font-size:.72rem;text-transform:uppercase;letter-spacing:.3px;border-bottom:1px solid var(--border)}
+  table.seg tfoot td{font-weight:700;background:#FFF7F8;border-top:2px solid var(--rojo)}
   table.seg tbody tr.seg-row{cursor:pointer}
   table.seg tbody tr.seg-row:hover td{background:var(--rojo-soft)}
-  table.seg tbody tr.seg-row.abierto td{position:sticky;top:40px;z-index:2;background:#FFF7F8;box-shadow:inset 0 -1px 0 var(--border)}
+  table.seg tbody tr.seg-row.abierto td{background:#FFF7F8}
   .seg .caret{display:inline-block;transition:transform .15s;margin-right:9px;color:var(--rojo);font-size:.8rem}
   table.seg tbody tr.seg-row.abierto .caret{transform:rotate(90deg)}
   .seg .alm-name{font-weight:700;color:var(--texto)}
